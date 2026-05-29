@@ -5,6 +5,8 @@ import sqlite3
 from datetime import datetime
 from flask import Flask
 from threading import Thread
+import os
+TOKEN = os.getenv("TOKEN")
 
 app = Flask(__name__)
 
