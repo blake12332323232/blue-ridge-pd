@@ -5,8 +5,7 @@ import sqlite3
 from datetime import datetime
 from flask import Flask
 from threading import Thread
-import os
-TOKEN = os.getenv("TOKEN")
+
 
 app = Flask(__name__)
 
@@ -853,4 +852,4 @@ async def leave(interaction: discord.Interaction):
             ephemeral=True
         )
 keep_alive()
-bot.run(TOKEN)
+bot.run("MTQ3NDEwOTE4NzkxODM5NzU5NA.Gzt6N5.XXcgu05iQWUbKeV212pPPjzqr6IWv3ouT-Dh_A")
