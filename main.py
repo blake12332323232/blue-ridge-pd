@@ -852,4 +852,4 @@ async def leave(interaction: discord.Interaction):
             ephemeral=True
         )
 keep_alive()
-bot.run("MTQ3NDEwOTE4NzkxODM5NzU5NA.Gzt6N5.XXcgu05iQWUbKeV212pPPjzqr6IWv3ouT-Dh_A")
+bot.run("MTQ3NDEwOTE4NzkxODM5NzU5NA.GbiIiD.f8cjaLqQ1MEN5_V1EtvDeqhSOUWBXI2d8D3-60")
