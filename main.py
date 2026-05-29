@@ -536,177 +536,118 @@ class TrainingSetupModal(discord.ui.Modal):
 # ---------- TRAINING MANAGEMENT VIEW ---------- #
 
 class TrainingManagementView(discord.ui.View):
-
     def __init__(self, training_id):
         super().__init__(timeout=None)
         self.training_id = training_id
 
     # ---------------- JOIN ATTENDANCE ---------------- #
-
     @discord.ui.button(
         label="Join Attendance",
         style=discord.ButtonStyle.green,
         custom_id="join_attendance"
     )
-    async def join_attendance(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
+    async def join_attendance(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         training = active_trainings.get(self.training_id)
 
         if not training:
             return await interaction.response.send_message(
-                "This training session expired.",
+                "❌ This training session expired.",
                 ephemeral=True
             )
 
         if training["attendance_locked"]:
             return await interaction.response.send_message(
-                "Attendance is locked.",
+                "❌ Attendance is locked.",
                 ephemeral=True
             )
 
-        vc = interaction.guild.get_channel(
-            training["voice_channel"]
-        )
+        vc = interaction.guild.get_channel(training["voice_channel"])
 
-        if interaction.user.voice is None:
+        if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message(
-                "You must be in the training VC.",
+                "❌ You must be in the training VC.",
                 ephemeral=True
             )
 
         if interaction.user.voice.channel.id != vc.id:
             return await interaction.response.send_message(
-                "You are not in the correct training VC.",
+                "❌ You are not in the correct training VC.",
                 ephemeral=True
             )
 
         if interaction.user.id not in training["attendees"]:
-            training["attendees"].append(
-                interaction.user.id
-            )
+            training["attendees"].append(interaction.user.id)
 
         await interaction.response.send_message(
-            "Attendance recorded.",
+            "✅ Attendance recorded.",
             ephemeral=True
         )
 
     # ---------------- LOCK ATTENDANCE ---------------- #
-
     @discord.ui.button(
         label="Lock Attendance",
         style=discord.ButtonStyle.red,
         custom_id="lock_attendance"
     )
-    async def lock_attendance(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
+    async def lock_attendance(self, interaction: discord.Interaction, button: discord.ui.Button):
 
-        training = active_trainings.get(
-            self.training_id
-        )
+        training = active_trainings.get(self.training_id)
 
         if not training:
             return await interaction.response.send_message(
-                "Training session expired.",
+                "❌ Training session expired.",
                 ephemeral=True
             )
 
         # ONLY HOST CAN LOCK
         if interaction.user.id != training["host"]:
             return await interaction.response.send_message(
-                "Only the training host can lock attendance.",
+                "❌ Only the host can lock attendance.",
                 ephemeral=True
             )
 
         training["attendance_locked"] = True
 
-        attendee_mentions = []
+        vc = interaction.guild.get_channel(training["voice_channel"])
 
-        for user_id in training["attendees"]:
-
-            member = interaction.guild.get_member(
-                user_id
-            )
-
+        attendees = []
+        for uid in training["attendees"]:
+            member = interaction.guild.get_member(uid)
             if member:
-                attendee_mentions.append(
-                    member.mention
-                )
+                attendees.append(member.mention)
 
-        vc = interaction.guild.get_channel(
-            training["voice_channel"]
-        )
-
-        locked_embed = discord.Embed(
-            title="Training Attendance Locked",
+        embed = discord.Embed(
+            title="📌 Attendance Locked",
             color=discord.Color.red()
         )
 
-        locked_embed.add_field(
-            name="Host",
-            value=interaction.user.mention,
-            inline=False
-        )
-
-        locked_embed.add_field(
-            name="Voice Channel",
-            value=vc.mention if vc else "Unknown VC",
-            inline=False
-        )
-
-        locked_embed.add_field(
-            name="Duration",
-            value=training["duration"],
-            inline=False
-        )
-
-        locked_embed.add_field(
-            name="Attendance Status",
-            value="LOCKED",
-            inline=False
-        )
-
-        locked_embed.add_field(
+        embed.add_field(name="Host", value=interaction.user.mention, inline=False)
+        embed.add_field(name="VC", value=vc.mention if vc else "Unknown", inline=False)
+        embed.add_field(name="Duration", value=training["duration"], inline=False)
+        embed.add_field(
             name="Attendees",
-            value="\n".join(attendee_mentions)
-            if attendee_mentions else "No attendees",
+            value="\n".join(attendees) if attendees else "None",
             inline=False
         )
 
-        # CREATE NEW VIEW
-        new_view = discord.ui.View(
-            timeout=None
-        )
+        # disable old buttons
+        for item in self.children:
+            item.disabled = True
 
-        # ADD COMPLETE BUTTON
-        new_view.add_item(
-            TrainingCompleteButton(
-                self.training_id
-            )
-        )
+        # add complete button
+        self.add_item(TrainingCompleteButton(self.training_id))
 
-        # EDIT MESSAGE
-        await interaction.response.edit_message(
-            embed=locked_embed,
-            view=new_view
-        )
+        await interaction.response.edit_message(embed=embed, view=self)
 # ---------- TRAINING COMPLETE BUTTON ---------- #
 
 class TrainingCompleteButton(discord.ui.Button):
-
     def __init__(self, training_id):
         super().__init__(
             label="Training Complete",
             style=discord.ButtonStyle.green,
             custom_id=f"training_complete_{training_id}"
         )
-
         self.training_id = training_id
 
     async def callback(self, interaction: discord.Interaction):
@@ -715,74 +656,45 @@ class TrainingCompleteButton(discord.ui.Button):
 
         if not training:
             return await interaction.response.send_message(
-                "Training session expired.",
+                "❌ Training expired.",
                 ephemeral=True
             )
 
-        # ONLY HOST CAN COMPLETE
         if interaction.user.id != training["host"]:
             return await interaction.response.send_message(
-                "Only the training host can complete this training.",
+                "❌ Only the host can complete this training.",
                 ephemeral=True
             )
 
-        attendee_mentions = []
-
-        for user_id in training["attendees"]:
-            member = interaction.guild.get_member(user_id)
-
+        attendees = []
+        for uid in training["attendees"]:
+            member = interaction.guild.get_member(uid)
             if member:
-                attendee_mentions.append(member.mention)
-
-                # AUTO DM TO ATTENDEES
+                attendees.append(member.mention)
                 try:
-                    await member.send(
-                        f"You attended a training hosted by "
-                        f"{interaction.user.name}."
-                    )
+                    await member.send(f"You attended training hosted by {interaction.user}.")
                 except:
                     pass
 
         vc = interaction.guild.get_channel(training["voice_channel"])
 
-        complete_embed = discord.Embed(
-            title="Training Completed",
+        embed = discord.Embed(
+            title="✅ Training Completed",
             color=discord.Color.green()
         )
 
-        complete_embed.add_field(
-            name="Host",
-            value=interaction.user.mention,
+        embed.add_field(name="Host", value=interaction.user.mention, inline=False)
+        embed.add_field(name="VC", value=vc.mention if vc else "Unknown", inline=False)
+        embed.add_field(name="Duration", value=training["duration"], inline=False)
+        embed.add_field(
+            name="Attendees",
+            value="\n".join(attendees) if attendees else "None",
             inline=False
         )
 
-        complete_embed.add_field(
-            name="Voice Channel",
-            value=vc.mention if vc else "Unknown VC",
-            inline=False
-        )
-
-        complete_embed.add_field(
-            name="Duration",
-            value=training["duration"],
-            inline=False
-        )
-
-        complete_embed.add_field(
-            name="Final Attendees",
-            value="\n".join(attendee_mentions) if attendee_mentions else "No attendees",
-            inline=False
-        )
-
-        # REMOVE TRAINING
         del active_trainings[self.training_id]
 
-        finished_view = discord.ui.View()
-        
-        await interaction.response.edit_message(
-            embed=complete_embed,
-            view=finished_view
-        )
+        await interaction.response.edit_message(embed=embed, view=discord.ui.View())
 # ---------- VOICE CHANNEL SELECT ---------- #
 
 class TrainingVCSelect(discord.ui.Select):
